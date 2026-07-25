@@ -15,7 +15,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="openedx-mcp",
-    version="0.1.4",
+    version="0.1.5",
     description="Open edX admin operations exposed as an MCP facade for staff/superusers (Ulmo)",
     long_description=__doc__,
     author="Open edX MCP contributors",
@@ -27,6 +27,9 @@ setup(
         "Django>=4.2",
         "djangorestframework",
     ],
+    extras_require={
+        "test": ["pytest", "pytest-django", "pytest-cov", "ruff"],
+    },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Framework :: Django",

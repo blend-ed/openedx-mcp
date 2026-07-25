@@ -159,15 +159,27 @@ openedx_mcp/
 | `OPENEDX_MCP_DEFAULT_KEY_TTL_DAYS` | `90` | Auto-expiry for new keys (blank expiry). `None` = no expiry. |
 | `OPENEDX_MCP_PUBLIC_URL` | `""` | Public MCP endpoint shown in the admin connect banner (the Tutor plugin sets it). |
 
-## Develop
+## Develop & test
+
+Follows the Open edX cookiecutter-django-app convention (`test_settings.py`,
+`Makefile`, `tox.ini`, `requirements/`), but the suite runs **without booting the
+platform** — a sqlite `test_settings` plus a guarded `apps.py` let the models,
+admin, auth and safety-rails be tested directly.
 
 ```bash
-pip install ruff pytest "django>=4.2,<5"
-ruff check openedx_mcp tests
-pytest            # platform-free unit tests (rails)
+make test.requirements     # pip install -r requirements/test.txt
+make quality               # ruff
+make test                  # pytest — models, key auth, scopes, rails (sqlite)
+# or: tox -e py312-django42 / tox -e quality
 ```
 
-Native wrappers need a running platform (devstack) to exercise end-to-end.
+The `native/` wrappers call `openedx-platform` at runtime, so they're exercised
+against a running devstack (in-container), not in the standalone suite:
+
+```bash
+# from a Tutor dev stack with this package mounted into the LMS/CMS
+tutor dev exec lms bash -c "cd /mnt/openedx-mcp && DJANGO_SETTINGS_MODULE=test_settings pytest"
+```
 
 See [CHANGELOG.md](CHANGELOG.md) · [CONTRIBUTING.md](CONTRIBUTING.md) ·
 [TODO.md](TODO.md).
