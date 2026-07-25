@@ -47,8 +47,8 @@ def submit_report(request, course_id, kind="grades", features=None):
 
 def list_tasks(course_id):
     """Recent instructor tasks for a course, with poll status."""
-    from lms.djangoapps.instructor_task.models import InstructorTask
     from lms.djangoapps.instructor_task.api_helper import get_status_from_instructor_task
+    from lms.djangoapps.instructor_task.models import InstructorTask
     rows = InstructorTask.objects.filter(course_id=_key(course_id)).order_by("-created")[:50]
     return {"course_id": str(_key(course_id)),
             "tasks": [get_status_from_instructor_task(t) for t in rows]}

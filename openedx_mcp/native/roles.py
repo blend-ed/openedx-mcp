@@ -30,8 +30,8 @@ def _course_role(level, course_id):
 def list_user_roles(username_or_email):
     """All CourseAccessRole rows for a user. Native: UserBasedRole.courses_with_role
     is per-role; we read the model directly for a full picture."""
-    from django.contrib.auth import get_user_model
     from common.djangoapps.student.models import CourseAccessRole
+    from django.contrib.auth import get_user_model
     user = get_user_model().objects.get(username=username_or_email)
     rows = CourseAccessRole.objects.filter(user=user).values("role", "org", "course_id")
     return {"user": user.username,

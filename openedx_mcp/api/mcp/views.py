@@ -1,11 +1,24 @@
-"""LMS read-only tool endpoints + whoami. All require staff/superuser."""
+"""LMS read-only tool endpoints + whoami. All require staff/superuser (except
+the unauthenticated health probe)."""
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from ...native import analytics as na
 from ...native import roles as nr
 from ...native import users as nu
 from .auth import get_key, granted_scopes
 from .base import MCPView
+
+
+class HealthView(APIView):
+    """Unauthenticated liveness probe. No DB, no platform calls — just confirms
+    the facade is up. Used by container/k8s probes."""
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({"status": "ok", "service": "openedx-mcp"})
 
 
 class WhoAmIView(MCPView):

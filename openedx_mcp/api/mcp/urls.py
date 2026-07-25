@@ -10,6 +10,9 @@ app_name = "openedx_mcp"
 COURSE_ID = "<path:course_id>"
 
 urlpatterns = [
+    # unauthenticated liveness
+    path("health/", v.HealthView.as_view(), name="health"),
+
     # context
     path("whoami/", v.WhoAmIView.as_view(), name="whoami"),
 

@@ -40,8 +40,8 @@ def course_detail(course_id):
 def analytics_overview(org=None):
     """Consolidated stat cards across the platform (or one org): course count,
     total enrollments, per-course enrollment counts."""
-    from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
     from common.djangoapps.student.models import CourseEnrollment
+    from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
     qs = CourseOverview.get_all_courses(orgs=[org] if org else None)
     per_course, total_enroll = [], 0
     for c in qs:
