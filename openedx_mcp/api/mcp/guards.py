@@ -29,7 +29,7 @@ from django.core.cache import cache
 from rest_framework import status
 from rest_framework.response import Response
 
-from ...models import MCPAuditLog
+from ...models import MCPAuditLog, Scope
 from .auth import get_key, require_scopes
 
 log = logging.getLogger(__name__)
@@ -46,7 +46,14 @@ RATE_LIMITS = {
     "bulk_enroll": (5, 300),
     "create_user": (20, 300),
     "set_role": (30, 60),
+    "instructor_access": (30, 60),
+    "reset_attempts": (30, 60),
     "deactivate_user": (10, 300),
+    "generate_certificate": (10, 300),
+    "regenerate_certificates": (5, 600),
+    "invalidate_certificate": (20, 300),
+    "submit_report": (10, 300),
+    "request_retirement": (5, 600),
     "create_xblock": (200, 60),
     "update_xblock": (200, 60),
     "publish_xblock": (100, 60),
@@ -124,7 +131,7 @@ def _unpack(result):
     return result, 0
 
 
-def audited_write(tool, scope="", require_confirm=True):
+def audited_write(tool, scope="", destructive=False, require_confirm=True):
     """Wrap a DRF view method with the write rails.
 
     The wrapped method is called as `method(self, request, *args, confirmed=bool,
@@ -135,8 +142,12 @@ def audited_write(tool, scope="", require_confirm=True):
     def decorator(view_method):
         @functools.wraps(view_method)
         def wrapper(self, request, *args, **kwargs):
-            if scope:
-                require_scopes(request, scope)  # raises PermissionDenied on miss
+            # `destructive` is ADDITIVE: a destructive tool needs its domain
+            # scope AND the destructive scope, so a key cannot delete without
+            # also holding the relevant write scope.
+            needed = [s for s in (scope, Scope.DESTRUCTIVE.value if destructive else "") if s]
+            if needed:
+                require_scopes(request, *needed)  # raises PermissionDenied on miss
 
             key = get_key(request)
             key_id = key.pk if key else None

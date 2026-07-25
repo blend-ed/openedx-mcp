@@ -8,15 +8,61 @@ clear, so it cannot be shown again). Thereafter the row shows only a prefix.
 """
 from datetime import timedelta
 
+from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
 from django.utils import timezone
 
-from .models import MCPAuditLog, MCPKey, generate_raw_key
+from .models import MCPAuditLog, MCPKey, Scope, generate_raw_key
+
+
+def _mcp_url():
+    """Public MCP endpoint, if the deployment set it (the Tutor plugin injects
+    OPENEDX_MCP_PUBLIC_URL into LMS/CMS settings). Falls back to a placeholder."""
+    return getattr(settings, "OPENEDX_MCP_PUBLIC_URL", "") or "https://mcp.<LMS_HOST>/mcp"
+
+
+def _connect_message(raw):
+    """Success banner shown once at key creation: the raw key plus copy-paste
+    connect steps for Claude. The key is embedded so the admin can copy a ready
+    command; it is never stored in the clear and cannot be shown again."""
+    url = _mcp_url()
+    return (
+        "MCP key created. Copy it now — it will NOT be shown again:\n"
+        f"{raw}\n\n"
+        "Connect from Claude Code (CLI):\n"
+        f'  claude mcp add --transport http openedx {url} '
+        f'--header "Authorization: Bearer {raw}"\n\n'
+        "Connect from Claude Desktop (claude_desktop_config.json):\n"
+        '  "openedx": {\n'
+        '    "command": "npx",\n'
+        f'    "args": ["-y","mcp-remote","{url}","--header","Authorization:${{AUTH}}"],\n'
+        f'    "env": {{"AUTH": "Bearer {raw}"}}\n'
+        "  }\n\n"
+        "Then call the whoami tool to confirm identity + scopes."
+    )
+
+
+class MCPKeyForm(forms.ModelForm):
+    """Render the scopes JSONField as a checkbox list of every available scope,
+    instead of a raw JSON textbox. Selected boxes are stored as a JSON array."""
+
+    scopes = forms.MultipleChoiceField(
+        choices=Scope.choices,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        help_text="Least-privilege subset for this key. Cannot exceed what the "
+                  "acting user is already allowed. None selected = read only.",
+    )
+
+    class Meta:
+        model = MCPKey
+        fields = "__all__"
 
 
 @admin.register(MCPKey)
 class MCPKeyAdmin(admin.ModelAdmin):
+    form = MCPKeyForm
     list_display = ("name", "user", "key_prefix", "scopes", "is_revoked", "expires_at",
                     "last_used_at", "created_at")
     list_filter = ("is_revoked", "created_at")
@@ -42,7 +88,7 @@ class MCPKeyAdmin(admin.ModelAdmin):
             super().save_model(request, obj, form, change)
             messages.warning(
                 request,
-                "MCP key created. Copy it now — it will not be shown again:\n%s" % raw,
+                _connect_message(raw),
             )
         else:
             super().save_model(request, obj, form, change)

@@ -30,7 +30,7 @@ class CourseCertificatesView(MCPView):
 
 
 class GenerateCertificateView(MCPView):
-    @audited_write("generate_certificate", scope=Scope.WRITE_USERS, require_confirm=False)
+    @audited_write("generate_certificate", scope=Scope.WRITE_CERTIFICATES, require_confirm=False)
     def post(self, request, confirmed=True):
         d = request.data
         # Batch when no username given (whole course / a student_set).
@@ -41,7 +41,7 @@ class GenerateCertificateView(MCPView):
 
 
 class RegenerateCertificatesView(MCPView):
-    @audited_write("generate_certificate", scope=Scope.WRITE_USERS, require_confirm=True)
+    @audited_write("regenerate_certificates", scope=Scope.WRITE_CERTIFICATES, require_confirm=True)
     def post(self, request, confirmed=True):
         d = request.data
         if not confirmed:
@@ -51,7 +51,7 @@ class RegenerateCertificatesView(MCPView):
 
 
 class InvalidateCertificateView(MCPView):
-    @audited_write("invalidate_certificate", scope=Scope.DESTRUCTIVE, require_confirm=True)
+    @audited_write("invalidate_certificate", scope=Scope.WRITE_CERTIFICATES, destructive=True, require_confirm=True)
     def post(self, request, confirmed=True):
         d = request.data
         if not confirmed:
@@ -63,7 +63,7 @@ class InvalidateCertificateView(MCPView):
 # --- async reports (grade export) ---
 
 class SubmitReportView(MCPView):
-    @audited_write("submit_report", scope=Scope.READ, require_confirm=False)
+    @audited_write("submit_report", scope=Scope.WRITE_REPORTS, require_confirm=False)
     def post(self, request, confirmed=True):
         d = request.data
         return Response(nrep.submit_report(
@@ -90,7 +90,7 @@ class RetirementStatusView(MCPView):
 
 
 class RequestRetirementView(MCPView):
-    @audited_write("request_retirement", scope=Scope.DESTRUCTIVE, require_confirm=True)
+    @audited_write("request_retirement", scope=Scope.WRITE_USERS, destructive=True, require_confirm=True)
     def post(self, request, confirmed=True):
         d = request.data
         full = d.get("full", True)
