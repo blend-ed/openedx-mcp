@@ -6,8 +6,12 @@ from ...models import Scope
 from ...native import enrollment as ne
 from ...native import roles as nr
 from ...native import users as nu
+from .auth import require_scopes
 from .base import MCPView
 from .guards import audited_write
+
+# Levels that toggle platform-wide admin — gated by grant:admin, not write:roles.
+_ADMIN_LEVELS = {"global_staff", "superuser"}
 
 
 class EnrollUserView(MCPView):
@@ -54,12 +58,15 @@ class CreateUserView(MCPView):
 
 class SetRoleView(MCPView):
     """Grant/revoke a course or global role. action ∈ grant|revoke; also handles
-    global staff / superuser flags."""
-    @audited_write("set_role", scope=Scope.WRITE_USERS, require_confirm=True)
+    global staff / superuser flags. Course roles need write:roles; global_staff/
+    superuser additionally need grant:admin."""
+    @audited_write("set_role", scope=Scope.WRITE_ROLES, require_confirm=True)
     def post(self, request, confirmed=True):
         d = request.data
         action, level = d["action"], d["level"]
         user = d["username"]
+        if level in _ADMIN_LEVELS:
+            require_scopes(request, Scope.GRANT_ADMIN)  # escalation gate
         if not confirmed:
             return Response({"would": action, "level": level, "user": user,
                              "course_id": d.get("course_id")})
@@ -74,7 +81,7 @@ class SetRoleView(MCPView):
 
 class InstructorAccessView(MCPView):
     """allow/revoke instructor-dashboard access on a course."""
-    @audited_write("set_role", scope=Scope.WRITE_USERS, require_confirm=True)
+    @audited_write("instructor_access", scope=Scope.WRITE_ROLES, require_confirm=True)
     def post(self, request, confirmed=True):
         d = request.data
         action, level, course_id, user = d["action"], d.get("level", "staff"), \
@@ -100,8 +107,8 @@ class ResetAttemptsView(MCPView):
 
 
 class DeactivateUserView(MCPView):
-    """Destructive: disable an account (is_active=False)."""
-    @audited_write("deactivate_user", scope=Scope.DESTRUCTIVE, require_confirm=True)
+    """Destructive: disable an account (is_active=False). Needs write:users + destructive."""
+    @audited_write("deactivate_user", scope=Scope.WRITE_USERS, destructive=True, require_confirm=True)
     def post(self, request, confirmed=True):
         user = nu.get_user(request.data["username"])
         if user is None:

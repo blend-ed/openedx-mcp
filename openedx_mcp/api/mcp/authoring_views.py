@@ -56,7 +56,7 @@ class PublishBlockView(MCPView):
 
 
 class DeleteBlockView(MCPView):
-    @audited_write("delete_xblock", scope=Scope.WRITE_COURSES, require_confirm=True)
+    @audited_write("delete_xblock", scope=Scope.WRITE_COURSES, destructive=True, require_confirm=True)
     def post(self, request, confirmed=True):
         d = request.data
         if not confirmed:

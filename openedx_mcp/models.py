@@ -36,11 +36,15 @@ def hash_key(raw):
 
 
 class Scope(models.TextChoices):
-    READ = "read", "Read (analytics, listings, whoami)"
-    WRITE_ENROLLMENT = "write:enrollment", "Write enrollment (enroll/unenroll)"
-    WRITE_USERS = "write:users", "Write users (create/roles)"
-    WRITE_COURSES = "write:courses", "Write courses (authoring, settings)"
-    DESTRUCTIVE = "destructive", "Destructive (delete course, deactivate user)"
+    READ = "read", "Read (analytics, listings, grades, cert/report status, whoami)"
+    WRITE_ENROLLMENT = "write:enrollment", "Write enrollment (enroll/unenroll/bulk)"
+    WRITE_USERS = "write:users", "Write users (create account, reset attempts)"
+    WRITE_ROLES = "write:roles", "Write roles (course roles, instructor access)"
+    GRANT_ADMIN = "grant:admin", "Grant admin (global_staff / superuser) — highest"
+    WRITE_CERTIFICATES = "write:certificates", "Write certificates (generate/regenerate)"
+    WRITE_REPORTS = "write:reports", "Write reports (submit async exports)"
+    WRITE_COURSES = "write:courses", "Write courses (authoring blocks, settings)"
+    DESTRUCTIVE = "destructive", "Destructive (delete/invalidate/deactivate/retire) — additive"
 
 
 ALL_SCOPES = [c.value for c in Scope]
