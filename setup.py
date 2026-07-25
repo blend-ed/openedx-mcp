@@ -15,7 +15,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="openedx-mcp",
-    version="0.1.3",
+    version="0.1.4",
     description="Open edX admin operations exposed as an MCP facade for staff/superusers (Ulmo)",
     long_description=__doc__,
     author="Open edX MCP contributors",

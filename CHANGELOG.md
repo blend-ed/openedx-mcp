@@ -3,6 +3,17 @@
 All notable changes to `openedx-mcp`. Format based on
 [Keep a Changelog](https://keepachangelog.com/). Ulmo release line.
 
+## [0.1.4]
+
+### Fixed
+- `bulk_enroll` crashed on the confirmed write with
+  `too many values to unpack (expected 2)` — Ulmo's
+  `instructor.enrollment.enroll_email` returns a 3-tuple
+  `(previous_state, after_state, enrollment_obj)`, not two. Now indexed
+  arity-tolerantly. The dry-run was unaffected (different code path), so the
+  error only surfaced on confirm. Row results also now include `allowed` (the
+  pending-invite state for unregistered addresses).
+
 ## [0.1.3]
 
 ### Added
@@ -40,6 +51,7 @@ All notable changes to `openedx-mcp`. Format based on
   `reset_student_attempts`, `create_block_tree`. Key auto-expiry; real
   bulk-enroll audience preview.
 
+[0.1.4]: https://github.com/blend-ed/openedx-mcp/releases/tag/v0.1.4
 [0.1.3]: https://github.com/blend-ed/openedx-mcp/releases/tag/v0.1.3
 [0.1.2]: https://github.com/blend-ed/openedx-mcp/releases/tag/v0.1.2
 [0.1.1]: https://github.com/blend-ed/openedx-mcp/releases/tag/v0.1.1
