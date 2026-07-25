@@ -39,8 +39,13 @@ def bulk_enroll(course_id, entries, mode="audit", auto_enroll=True):
         email = e.get("email")
         entry_mode = e.get("mode", mode)
         try:
-            before, after = enroll_email(key, email, auto_enroll=auto_enroll)
-            results.append({"email": email, "mode": entry_mode, "enrolled": after.enrollment})
+            # Ulmo's enroll_email returns (previous_state, after_state,
+            # enrollment_obj) — index instead of a fixed-arity unpack so a future
+            # signature change can't re-break this.
+            states = enroll_email(key, email, auto_enroll=auto_enroll)
+            after = states[1]
+            results.append({"email": email, "mode": entry_mode,
+                            "enrolled": after.enrollment, "allowed": after.allowed})
         except Exception as exc:  # noqa: BLE001 — report per-row, don't abort the batch
             results.append({"email": email, "error": str(exc)})
     return {"course_id": str(key), "count": len(entries), "results": results}
