@@ -9,7 +9,6 @@ from ...native import retirement as nret
 from .base import MCPView
 from .guards import audited_write
 
-
 # --- certificates ---
 
 class UserCertificateView(MCPView):

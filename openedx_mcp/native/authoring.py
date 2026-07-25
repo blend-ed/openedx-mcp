@@ -8,13 +8,12 @@ Everything created lands on the DRAFT branch; publish to expose to learners.
 """
 from opaque_keys.edx.keys import CourseKey, UsageKey
 
-
 # --- outline / xblock CRUD ---
 
 def read_outline(user, course_id):
     """Full draft tree. Native: modulestore().get_course + create_xblock_info."""
-    from xmodule.modulestore.django import modulestore
     from cms.djangoapps.contentstore.xblock_storage_handlers.view_handlers import create_xblock_info
+    from xmodule.modulestore.django import modulestore
     course = modulestore().get_course(CourseKey.from_string(course_id), depth=None)
     if course is None:
         return None
@@ -53,11 +52,11 @@ def create_block_tree(user, parent_locator, nodes):
 def update_block(user, locator, data=None, metadata=None, fields=None, publish=None):
     """Native: view_handlers._save_xblock. publish ∈ None|'make_public'|'republish'|
     'discard_changes'."""
-    from xmodule.modulestore.django import modulestore
     from cms.djangoapps.contentstore.xblock_storage_handlers.view_handlers import _save_xblock
+    from xmodule.modulestore.django import modulestore
     xblock = modulestore().get_item(UsageKey.from_string(locator))
-    resp = _save_xblock(user, xblock, data=data, metadata=metadata, fields=fields,
-                        publish=publish)
+    _save_xblock(user, xblock, data=data, metadata=metadata, fields=fields,
+                 publish=publish)
     return {"locator": locator, "saved": True, "publish": publish}
 
 
@@ -93,8 +92,8 @@ def update_course_settings(user, course_id, details=None, grading=None, advanced
         CourseGradingModel.update_from_json(key, grading, user)
         result["grading"] = "updated"
     if advanced:
-        from xmodule.modulestore.django import modulestore
         from cms.djangoapps.models.settings.course_metadata import CourseMetadata
+        from xmodule.modulestore.django import modulestore
         block = modulestore().get_course(key)
         _, errors = CourseMetadata.validate_and_update_from_json(block, advanced, user)
         result["advanced"] = "updated" if not errors else {"errors": errors}

@@ -70,8 +70,8 @@ def reset_student_attempts(course_id, username, block_locator, requesting_user,
     """Reset (or delete) a learner's state for one problem block. Native:
     instructor.enrollment.reset_student_attempts. Fires score-changed signals."""
     from django.contrib.auth import get_user_model
-    from opaque_keys.edx.keys import UsageKey
     from lms.djangoapps.instructor.enrollment import reset_student_attempts as _reset
+    from opaque_keys.edx.keys import UsageKey
     student = get_user_model().objects.get(username=username)
     _reset(_course_key(course_id), student, UsageKey.from_string(block_locator),
            requesting_user, delete_module=delete_module)

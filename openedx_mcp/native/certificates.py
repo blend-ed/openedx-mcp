@@ -63,7 +63,10 @@ def invalidate_certificate(request, username, course_id, notes=""):
     """Invalidate a user's cert (and record who did it)."""
     from django.contrib.auth import get_user_model
     from lms.djangoapps.certificates.api import (
-        get_certificate_for_user_id, create_certificate_invalidation_entry,
+        create_certificate_invalidation_entry,
+        get_certificate_for_user_id,
+    )
+    from lms.djangoapps.certificates.api import (
         invalidate_certificate as _invalidate,
     )
     user = get_user_model().objects.get(username=username)
