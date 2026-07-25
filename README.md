@@ -33,7 +33,8 @@ people/access/analytics run in the **LMS**. One app, one `MCPKey` table, shared.
 With Tutor:
 
 ```bash
-tutor config save --set OPENEDXMCP_PIP_REQUIREMENT=openedx-mcp
+# tutor-contrib-openedxmcp auto-installs this app (Dockerfile patch); to pin:
+#   tutor config save --append OPENEDX_EXTRA_PIP_REQUIREMENTS=openedx-mcp==<ver>
 tutor images build openedx
 tutor local launch
 tutor local do init          # runs migrations -> creates MCPKey tables
