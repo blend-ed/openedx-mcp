@@ -1,0 +1,5 @@
+-r base.in
+pytest
+pytest-django
+pytest-cov
+ruff

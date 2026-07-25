@@ -3,6 +3,20 @@
 All notable changes to `openedx-mcp`. Format based on
 [Keep a Changelog](https://keepachangelog.com/). Ulmo release line.
 
+## [0.1.5]
+
+### Added
+- Open edX cookiecutter-style test scaffold: `test_settings.py` (sqlite),
+  `Makefile`, `tox.ini`, `requirements/`. Runs standalone — no platform boot.
+- DB-backed tests for models (key hashing/expiry/scopes, audit log) and for MCP
+  key authentication + the live staff/superuser gate + scope narrowing. CI now
+  runs a py3.11/3.12 matrix.
+
+### Changed
+- Guard the Open edX plugin imports in `apps.py` (`HAS_OPENEDX`) so the app loads
+  under a plain Django test settings module. Dropped the deprecated
+  `default_app_config`.
+
 ## [0.1.4]
 
 ### Fixed
@@ -48,6 +62,7 @@ All notable changes to `openedx-mcp`. Format based on
   `reset_student_attempts`, `create_block_tree`. Key auto-expiry; real
   bulk-enroll audience preview.
 
+[0.1.5]: https://github.com/blend-ed/openedx-mcp/releases/tag/v0.1.5
 [0.1.4]: https://github.com/blend-ed/openedx-mcp/releases/tag/v0.1.4
 [0.1.3]: https://github.com/blend-ed/openedx-mcp/releases/tag/v0.1.3
 [0.1.2]: https://github.com/blend-ed/openedx-mcp/releases/tag/v0.1.2

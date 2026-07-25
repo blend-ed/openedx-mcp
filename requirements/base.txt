@@ -1,0 +1,3 @@
+# Runtime deps (pin with pip-tools `make upgrade` if desired)
+Django>=4.2,<5.0
+djangorestframework
