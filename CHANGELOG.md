@@ -3,6 +3,19 @@
 All notable changes to `openedx-mcp`. Format based on
 [Keep a Changelog](https://keepachangelog.com/). Ulmo release line.
 
+## [0.1.6]
+
+### Changed
+- Minting a key in the admin now opens a **Connect a client** page instead of a
+  single flattened warning banner: the key with its own copy button, then
+  tabbed snippets for Claude Code, Claude Desktop, Cursor and VS Code, each
+  with a copy button. The page is the response to the save (not a redirect),
+  so the raw key is still never stored anywhere.
+- The same page is linked from the MCP key list. There, the admin pastes an
+  existing key and the snippets are built in the browser; the key is never sent
+  to the server.
+- Added `MANIFEST.in` so the admin templates ship in the sdist.
+
 ## [0.1.5]
 
 ### Added

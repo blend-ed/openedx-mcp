@@ -1,0 +1,214 @@
+{% extends "admin/base_site.html" %}
+{% comment %}
+Connect page for MCP clients. Reached two ways:
+  - right after a key is minted (response_add renders it with `raw_key` set), and
+  - from the "Connect a client" button on the key list, where the admin pastes a
+    key they already hold.
+The token never leaves the browser: snippets are assembled client-side in JS.
+{% endcomment %}
+{% block title %}Connect an MCP client | {{ site_title|default:"Django site admin" }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url 'admin:openedx_mcp_mcpkey_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; Connect a client
+</div>
+{% endblock %}
+
+{% block extrastyle %}{{ block.super }}
+<style>
+  .mcp-connect { max-width: 920px; }
+  .mcp-connect h2 { margin: 28px 0 8px; font-size: 1.1rem; }
+  .mcp-connect p.help { color: var(--body-quiet-color); margin: 4px 0 0; }
+  .mcp-once {
+    border: 1px solid var(--message-warning-bg, #ffc);
+    border-left-width: 6px; border-radius: 4px;
+    padding: 12px 16px; margin-bottom: 16px;
+  }
+  .mcp-once strong { display: block; margin-bottom: 4px; }
+  .mcp-row { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
+  .mcp-row input[type=text], .mcp-row input[type=password] {
+    flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem; padding: 6px 8px; min-width: 0;
+  }
+  .mcp-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--hairline-color); margin-top: 8px; }
+  .mcp-tabs button {
+    background: none; border: 1px solid transparent; border-bottom: none;
+    color: var(--link-fg); padding: 8px 14px; cursor: pointer; font-size: 0.9rem;
+    border-radius: 4px 4px 0 0; margin-bottom: -1px;
+  }
+  .mcp-tabs button[aria-selected=true] {
+    color: var(--body-fg); border-color: var(--hairline-color);
+    background: var(--body-bg); font-weight: 600;
+  }
+  .mcp-panel { padding: 12px 0; }
+  .mcp-panel[hidden] { display: none; }
+  .mcp-snippet { position: relative; margin: 8px 0 4px; }
+  .mcp-snippet pre {
+    background: var(--darkened-bg); border: 1px solid var(--hairline-color);
+    border-radius: 4px; padding: 12px 14px; padding-right: 84px; margin: 0;
+    white-space: pre-wrap; word-break: break-all;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem;
+    line-height: 1.5; color: var(--body-fg);
+  }
+  .mcp-snippet .button { position: absolute; top: 8px; right: 8px; }
+  .mcp-panel ul { margin: 6px 0 0 18px; padding: 0; }
+  .mcp-panel li { list-style: disc; }
+  .mcp-panel code { font-size: 0.85rem; }
+  .mcp-footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--hairline-color); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="content-main" class="mcp-connect">
+
+  {% if raw_key %}
+  <div class="mcp-once">
+    <strong>Key “{{ key_name }}” created. Copy it now, it won’t be shown again.</strong>
+    Only a hash is stored. If you lose this key, revoke it and mint a new one.
+    <div class="mcp-row">
+      <input type="text" id="mcp-raw" value="{{ raw_key }}" readonly aria-label="New MCP key">
+      <button type="button" class="button" data-copy="#mcp-raw">Copy key</button>
+    </div>
+  </div>
+  {% endif %}
+
+  <h2>1. MCP key</h2>
+  <div class="mcp-row">
+    <input type="password" id="mcp-token" autocomplete="off" spellcheck="false"
+           placeholder="mcpk_…" value="{{ raw_key|default:'' }}" aria-label="MCP key">
+    <button type="button" class="button" id="mcp-reveal">Show</button>
+  </div>
+  <p class="help">Paste a key you already have. It stays in this browser and is only used to fill in the snippets below.</p>
+
+  <h2>2. Pick your client</h2>
+  <div class="mcp-tabs" role="tablist">
+    <button type="button" role="tab" data-tab="claude-code" aria-selected="true">Claude Code</button>
+    <button type="button" role="tab" data-tab="claude-desktop" aria-selected="false">Claude Desktop</button>
+    <button type="button" role="tab" data-tab="cursor" aria-selected="false">Cursor</button>
+    <button type="button" role="tab" data-tab="vscode" aria-selected="false">VS Code</button>
+  </div>
+
+  <div class="mcp-panel" data-panel="claude-code" role="tabpanel">
+    <p>Run this in your terminal:</p>
+    <div class="mcp-snippet"><pre data-snippet="claude-code"></pre><button type="button" class="button" data-copy-snippet>Copy</button></div>
+    <p class="help">Then run <code>claude mcp list</code> to check it’s registered.</p>
+  </div>
+
+  <div class="mcp-panel" data-panel="claude-desktop" role="tabpanel" hidden>
+    <p>Claude Desktop has no header field, so it connects through the <code>mcp-remote</code> bridge (needs Node.js). Add this to <code>claude_desktop_config.json</code>:</p>
+    <div class="mcp-snippet"><pre data-snippet="claude-desktop"></pre><button type="button" class="button" data-copy-snippet>Copy</button></div>
+    <ul class="help">
+      <li>macOS: <code>~/Library/Application Support/Claude/claude_desktop_config.json</code></li>
+      <li>Windows: <code>%APPDATA%\Claude\claude_desktop_config.json</code></li>
+    </ul>
+    <p class="help">If the file already has <code>mcpServers</code>, merge the <code>openedx</code> entry into it. Restart Claude Desktop afterwards.</p>
+  </div>
+
+  <div class="mcp-panel" data-panel="cursor" role="tabpanel" hidden>
+    <p>Add this to <code>~/.cursor/mcp.json</code> (all projects) or <code>.cursor/mcp.json</code> (this project only):</p>
+    <div class="mcp-snippet"><pre data-snippet="cursor"></pre><button type="button" class="button" data-copy-snippet>Copy</button></div>
+  </div>
+
+  <div class="mcp-panel" data-panel="vscode" role="tabpanel" hidden>
+    <p>Add this to <code>.vscode/mcp.json</code> in your workspace:</p>
+    <div class="mcp-snippet"><pre data-snippet="vscode"></pre><button type="button" class="button" data-copy-snippet>Copy</button></div>
+  </div>
+
+  <div class="mcp-footer">
+    <p>3. In your client, ask it to call the <code>whoami</code> tool to check your identity and scopes.</p>
+    <p class="help">Endpoint: <code>{{ mcp_url }}</code> &middot;
+      Other clients and troubleshooting: <a href="{{ docs_url }}" target="_blank" rel="noopener">connect docs</a> &middot;
+      <a href="{% url 'admin:openedx_mcp_mcpkey_changelist' %}">Back to MCP keys</a></p>
+  </div>
+</div>
+
+{{ mcp_url|json_script:"mcp-url" }}
+<script>
+(function () {
+  var url = JSON.parse(document.getElementById("mcp-url").textContent);
+  var tokenInput = document.getElementById("mcp-token");
+  var PLACEHOLDER = "<YOUR_MCP_KEY>";
+
+  function snippets(token) {
+    var bearer = "Bearer " + token;
+    return {
+      "claude-code":
+        "claude mcp add --transport http openedx " + url + " \\\n" +
+        "  --header \"Authorization: " + bearer + "\"",
+      "claude-desktop": JSON.stringify({mcpServers: {openedx: {
+        command: "npx",
+        args: ["-y", "mcp-remote", url, "--header", "Authorization:${AUTH}"],
+        env: {AUTH: bearer}
+      }}}, null, 2),
+      "cursor": JSON.stringify({mcpServers: {openedx: {
+        url: url, headers: {Authorization: bearer}
+      }}}, null, 2),
+      "vscode": JSON.stringify({servers: {openedx: {
+        type: "http", url: url, headers: {Authorization: bearer}
+      }}}, null, 2)
+    };
+  }
+
+  function render() {
+    var s = snippets(tokenInput.value.trim() || PLACEHOLDER);
+    document.querySelectorAll("[data-snippet]").forEach(function (pre) {
+      pre.textContent = s[pre.dataset.snippet];
+    });
+  }
+
+  function copy(text, btn) {
+    var done = function () {
+      var label = btn.textContent;
+      btn.textContent = "Copied";
+      setTimeout(function () { btn.textContent = label; }, 1500);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done);
+    } else {  // http:// devstacks have no async clipboard API
+      var ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); ta.remove(); done();
+    }
+  }
+
+  tokenInput.addEventListener("input", render);
+  document.getElementById("mcp-reveal").addEventListener("click", function () {
+    var hidden = tokenInput.type === "password";
+    tokenInput.type = hidden ? "text" : "password";
+    this.textContent = hidden ? "Hide" : "Show";
+  });
+
+  document.querySelectorAll("[data-tab]").forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      document.querySelectorAll("[data-tab]").forEach(function (t) {
+        t.setAttribute("aria-selected", t === tab ? "true" : "false");
+      });
+      document.querySelectorAll("[data-panel]").forEach(function (p) {
+        p.hidden = p.dataset.panel !== tab.dataset.tab;
+      });
+    });
+  });
+
+  document.querySelectorAll("[data-copy-snippet]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      copy(btn.previousElementSibling.textContent, btn);
+    });
+  });
+  document.querySelectorAll("[data-copy]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      copy(document.querySelector(btn.dataset.copy).value, btn);
+    });
+  });
+
+  // After minting, this page is the response to the add-form POST. Point the
+  // history entry at the plain connect URL so a reload doesn't re-POST and mint
+  // a second key.
+  {% if raw_key %}history.replaceState(null, "", "{% url 'admin:openedx_mcp_mcpkey_connect' %}");{% endif %}
+
+  render();
+})();
+</script>
+{% endblock %}

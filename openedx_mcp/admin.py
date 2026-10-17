@@ -3,14 +3,20 @@ Django admin for MCP keys — this IS the "console" for key creation.
 
 No custom MFE, no GraphQL. An is_staff user goes to /admin/openedx_mcp/mcpkey/,
 clicks Add, picks the acting user + scopes, and saves. The raw key is generated
-server-side and surfaced ONCE via a success message (it is never stored in the
-clear, so it cannot be shown again). Thereafter the row shows only a prefix.
+server-side and surfaced ONCE on the connect page rendered as the save response
+(it is never stored in the clear, so it cannot be shown again). Thereafter the
+row shows only a prefix. The same page, reached via "Connect a client" on the
+key list, lets an admin paste an existing key to build client snippets in the
+browser.
 """
 from datetime import timedelta
 
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
+from django.template.response import TemplateResponse
+from django.urls import path
 from django.utils import timezone
 
 from .models import MCPAuditLog, MCPKey, Scope, generate_raw_key
@@ -22,25 +28,8 @@ def _mcp_url():
     return getattr(settings, "OPENEDX_MCP_PUBLIC_URL", "") or "https://mcp.<LMS_HOST>/mcp"
 
 
-def _connect_message(raw):
-    """Success banner shown once at key creation: the raw key plus copy-paste
-    connect steps for Claude. The key is embedded so the admin can copy a ready
-    command; it is never stored in the clear and cannot be shown again."""
-    url = _mcp_url()
-    return (
-        "MCP key created. Copy it now — it will NOT be shown again:\n"
-        f"{raw}\n\n"
-        "Connect from Claude Code (CLI):\n"
-        f'  claude mcp add --transport http openedx {url} '
-        f'--header "Authorization: Bearer {raw}"\n\n'
-        "Connect from Claude Desktop (claude_desktop_config.json):\n"
-        '  "openedx": {\n'
-        '    "command": "npx",\n'
-        f'    "args": ["-y","mcp-remote","{url}","--header","Authorization:${{AUTH}}"],\n'
-        f'    "env": {{"AUTH": "Bearer {raw}"}}\n'
-        "  }\n\n"
-        "Then call the whoami tool to confirm identity + scopes."
-    )
+CONNECT_DOCS_URL = "https://docs.blend-ed.com/openedx-mcp/connect/"
+CONNECT_TEMPLATE = "admin/openedx_mcp/mcpkey/connect.html"
 
 
 class MCPKeyForm(forms.ModelForm):
@@ -86,12 +75,44 @@ class MCPKeyAdmin(admin.ModelAdmin):
                 if ttl_days:
                     obj.expires_at = timezone.now() + timedelta(days=ttl_days)
             super().save_model(request, obj, form, change)
-            messages.warning(
-                request,
-                _connect_message(raw),
-            )
+            obj._raw_key = raw  # in-memory only, for response_add
         else:
             super().save_model(request, obj, form, change)
+
+    def response_add(self, request, obj, post_url_continue=None):
+        # Render the connect page directly as the POST response instead of
+        # redirecting, so the raw key never has to be parked in the session.
+        raw = getattr(obj, "_raw_key", None)
+        if raw is None:
+            return super().response_add(request, obj, post_url_continue)
+        return self._render_connect(request, raw_key=raw, key_name=obj.name)
+
+    def get_urls(self):
+        info = self.opts.app_label, self.opts.model_name
+        return [
+            path("connect/", self.admin_site.admin_view(self.connect_view),
+                 name="%s_%s_connect" % info),
+        ] + super().get_urls()
+
+    def connect_view(self, request):
+        """Connect page without a fresh key: the admin pastes one client-side."""
+        if not self.has_view_or_change_permission(request):
+            raise PermissionDenied
+        return self._render_connect(request)
+
+    def _render_connect(self, request, raw_key=None, key_name=None):
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.opts,
+            "title": "Connect an MCP client",
+            "mcp_url": _mcp_url(),
+            "docs_url": CONNECT_DOCS_URL,
+            "raw_key": raw_key,
+            "key_name": key_name,
+        }
+        response = TemplateResponse(request, CONNECT_TEMPLATE, context)
+        response["Cache-Control"] = "no-store"  # page may carry the raw key
+        return response
 
     @admin.action(description="Revoke selected keys")
     def revoke_keys(self, request, queryset):
