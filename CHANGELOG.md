@@ -3,6 +3,15 @@
 All notable changes to `openedx-mcp`. Format based on
 [Keep a Changelog](https://keepachangelog.com/). Ulmo release line.
 
+## [0.1.7]
+
+### Changed
+- Redesigned the scope picker on the MCP key form. Scopes are now full-width
+  rows grouped as Read / Write / Elevated, each showing a short name, the scope
+  code and what it allows on one line. Grant admin is flagged "highest" and
+  Destructive "add-on". Added Read only / All / Clear presets. Stored values
+  are unchanged, so existing keys need no migration.
+
 ## [0.1.6]
 
 ### Changed

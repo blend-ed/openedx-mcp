@@ -1,0 +1,80 @@
+{% comment %}
+Scope picker for the MCP key form (ScopePickerWidget). Grouped full-width rows;
+the inputs are ordinary checkboxes named like CheckboxSelectMultiple's, so form
+handling is unchanged.
+{% endcomment %}
+<div class="mcp-scopes" id="{{ widget.attrs.id|default:'mcp-scopes' }}">
+  <style>
+    .mcp-scopes { flex: 1; min-width: 0; max-width: 860px; }
+    .mcp-scopes .mcp-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .mcp-scopes .mcp-presets button { font-size: 0.75rem; padding: 4px 10px; cursor: pointer; }
+    .mcp-scopes h4 {
+      margin: 12px 0 4px; padding: 0; font-size: 0.7rem; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase; color: var(--body-quiet-color);
+      background: none;
+    }
+    .mcp-scopes h4:first-of-type { margin-top: 0; }
+    .mcp-scopes label.mcp-scope {
+      display: grid; grid-template-columns: 20px minmax(110px, 150px) minmax(140px, 170px) 1fr;
+      align-items: baseline; gap: 4px 10px; width: auto; float: none;
+      padding: 7px 10px; margin: 0; cursor: pointer; font-weight: normal;
+      border: 1px solid var(--hairline-color); border-top-width: 0; color: var(--body-fg);
+    }
+    .mcp-scopes h4 + label.mcp-scope { border-top-width: 1px; border-radius: 4px 4px 0 0; }
+    .mcp-scopes label.mcp-scope.mcp-last { border-radius: 0 0 4px 4px; }
+    .mcp-scopes h4 + label.mcp-scope.mcp-last { border-radius: 4px; }
+    .mcp-scopes label.mcp-scope:hover { background: var(--darkened-bg); }
+    .mcp-scopes label.mcp-scope input { margin: 0; align-self: center; }
+    .mcp-scopes .mcp-name { font-weight: 600; white-space: nowrap; }
+    .mcp-scopes .mcp-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.8rem; color: var(--body-quiet-color); white-space: nowrap;
+    }
+    .mcp-scopes .mcp-help { color: var(--body-quiet-color); }
+    .mcp-scopes .mcp-badge {
+      display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 3px;
+      font-size: 0.65rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+      vertical-align: 1px; border: 1px solid currentColor; color: var(--error-fg, #ba2121);
+    }
+    .mcp-scopes .mcp-badge.mcp-add-on { color: var(--body-quiet-color); }
+    @media (max-width: 767px) {
+      .mcp-scopes label.mcp-scope { grid-template-columns: 20px 1fr; }
+      .mcp-scopes .mcp-code, .mcp-scopes .mcp-help { grid-column: 2; }
+    }
+  </style>
+
+  <div class="mcp-presets">
+    <button type="button" class="button" data-preset="read">Read only</button>
+    <button type="button" class="button" data-preset="all">All</button>
+    <button type="button" class="button" data-preset="none">Clear</button>
+  </div>
+
+  {% for title, rows in widget.scope_groups %}
+    <h4>{{ title }}</h4>
+    {% for row in rows %}{% with opt=row.option %}
+      <label class="mcp-scope{% if forloop.last %} mcp-last{% endif %}" for="{{ opt.attrs.id }}">
+        <input type="checkbox" name="{{ opt.name }}" value="{{ opt.value }}" id="{{ opt.attrs.id }}"
+               {% if opt.selected %}checked{% endif %}{% if widget.attrs.disabled %} disabled{% endif %}>
+        <span class="mcp-name">{{ row.name }}{% if row.badge %}<span class="mcp-badge{% if row.badge == 'add-on' %} mcp-add-on{% endif %}">{{ row.badge }}</span>{% endif %}</span>
+        <span class="mcp-code">{{ opt.value }}</span>
+        <span class="mcp-help">{{ row.help }}</span>
+      </label>
+    {% endwith %}{% endfor %}
+  {% endfor %}
+
+  <script>
+  (function () {
+    var root = document.currentScript.parentElement;
+    var READ = "{{ widget.read_scope|escapejs }}";
+    root.querySelectorAll("[data-preset]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var preset = btn.dataset.preset;
+        root.querySelectorAll("input[type=checkbox]").forEach(function (cb) {
+          if (cb.disabled) return;
+          cb.checked = preset === "all" || (preset === "read" && cb.value === READ);
+        });
+      });
+    });
+  })();
+  </script>
+</div>

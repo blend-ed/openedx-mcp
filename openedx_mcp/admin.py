@@ -32,13 +32,60 @@ CONNECT_DOCS_URL = "https://docs.blend-ed.com/openedx-mcp/connect/"
 CONNECT_TEMPLATE = "admin/openedx_mcp/mcpkey/connect.html"
 
 
+# Display metadata for the scope picker: (group, [(scope, short name, what it
+# allows, badge)]). Purely presentational; the stored value is the scope string.
+SCOPE_GROUPS = [
+    ("Read", [
+        (Scope.READ, "Read", "analytics, listings, grades, cert/report status, whoami", ""),
+    ]),
+    ("Write", [
+        (Scope.WRITE_ENROLLMENT, "Enrollment", "enroll, unenroll, bulk enroll", ""),
+        (Scope.WRITE_USERS, "Users", "create account, reset problem attempts", ""),
+        (Scope.WRITE_ROLES, "Roles", "course roles, instructor-dashboard access", ""),
+        (Scope.WRITE_CERTIFICATES, "Certificates", "generate, regenerate", ""),
+        (Scope.WRITE_REPORTS, "Reports", "submit async exports (grade reports)", ""),
+        (Scope.WRITE_COURSES, "Courses", "Studio authoring: blocks, settings, publish", ""),
+    ]),
+    ("Elevated", [
+        (Scope.GRANT_ADMIN, "Grant admin",
+         "make users global staff / superuser (with Roles)", "highest"),
+        (Scope.DESTRUCTIVE, "Destructive",
+         "delete, invalidate, deactivate, retire (with the matching write scope)", "add-on"),
+    ]),
+]
+
+
+class ScopePickerWidget(forms.CheckboxSelectMultiple):
+    """Checkbox list laid out as grouped rows (name · code · description) with
+    read-only / all / clear presets, instead of Django's narrow wrapped list."""
+
+    template_name = "admin/openedx_mcp/mcpkey/scope_picker.html"
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        options = {
+            opt["value"]: opt
+            for _, group, _ in context["widget"]["optgroups"] for opt in group
+        }
+        context["widget"]["scope_groups"] = [
+            (title, [
+                {"option": options[scope.value], "name": short, "help": help_text,
+                 "badge": badge}
+                for scope, short, help_text, badge in rows if scope.value in options
+            ])
+            for title, rows in SCOPE_GROUPS
+        ]
+        context["widget"]["read_scope"] = Scope.READ.value
+        return context
+
+
 class MCPKeyForm(forms.ModelForm):
     """Render the scopes JSONField as a checkbox list of every available scope,
     instead of a raw JSON textbox. Selected boxes are stored as a JSON array."""
 
     scopes = forms.MultipleChoiceField(
         choices=Scope.choices,
-        widget=forms.CheckboxSelectMultiple,
+        widget=ScopePickerWidget,
         required=False,
         help_text="Least-privilege subset for this key. Cannot exceed what the "
                   "acting user is already allowed. None selected = read only.",
