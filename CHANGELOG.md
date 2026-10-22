@@ -3,6 +3,42 @@
 All notable changes to `openedx-mcp`. Format based on
 [Keep a Changelog](https://keepachangelog.com/). Ulmo release line.
 
+## [Unreleased]
+
+### Fixed
+- `create_user` always failed with a 500 on Ulmo: `AccountCreationForm` moved to
+  `openedx.core.djangoapps.user_authn.views.registration_form`.
+- `create_user(send_activation_email=True)` sent nothing. It now calls
+  `compose_and_send_activation_email`.
+- A failed confirmed write left no audit row: the LMS's `ATOMIC_REQUESTS`
+  rolled back the whole request on the re-raised exception. The write now runs
+  in its own savepoint; on failure only its changes roll back, the `error` row is
+  kept, and the caller gets a JSON error instead of the HTML error page.
+- Errors are JSON with a meaningful status everywhere: an invalid course or
+  block id (including an unknown path suffix like `courses/<id>/foo/`) is 404, a
+  missing field or a non-numeric `limit`/`offset` is 400, a missing user is 404.
+
+### Changed
+- `unenroll` is now confirm-gated; its preview shows the current mode.
+- `bulk-enroll` takes `action=unenroll`, which unenrolls and withdraws pending
+  invites (`CourseEnrollmentAllowed`) — the only way to remove an invite to an
+  email with no account.
+- The `bulk-enroll` preview now says what happens to each address:
+  `will_enroll`, `will_be_pending`, `already_enrolled` (enroll) or
+  `will_unenroll`, `will_revoke_pending`, `not_enrolled` (unenroll). It replaces
+  `to_enroll` / `sample_new`.
+- The `create_user` preview includes name, `is_active` and
+  `send_activation_email`, and reports a taken username or email (409).
+- `course_detail` and `analytics_overview` report `pending` invites alongside
+  enrollments.
+
+### Added
+- `GET audit/` — recent MCP audit rows (superuser: all keys; staff: own rows).
+- CMS `GET courses/<course_id>/settings/` — course details and grading policy.
+
+### Removed
+- `.coverage` is no longer tracked.
+
 ## [0.1.8]
 
 ### Fixed

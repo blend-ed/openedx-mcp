@@ -31,27 +31,34 @@ def course_detail(course_id):
     c = get_course_overview_or_none(CourseKey.from_string(course_id))
     if c is None:
         return None
-    from .enrollment import enrollment_counts
+    from .enrollment import enrollment_counts, pending_count
     d = _overview_dict(c)
     d["enrollment"] = enrollment_counts(course_id)
+    # Invited by email (bulk_enroll) but no account/enrollment yet — not in the
+    # enrollment counts above.
+    d["pending"] = pending_count(course_id)
     return d
 
 
 def analytics_overview(org=None):
     """Consolidated stat cards across the platform (or one org): course count,
-    total enrollments, per-course enrollment counts."""
+    total enrollments and pending invites, per-course counts."""
     from common.djangoapps.student.models import CourseEnrollment
     from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+
+    from .enrollment import pending_count
     qs = CourseOverview.get_all_courses(orgs=[org] if org else None)
-    per_course, total_enroll = [], 0
+    per_course, total_enroll, total_pending = [], 0, 0
     for c in qs:
         counts = CourseEnrollment.objects.enrollment_counts(c.id)
+        pending = pending_count(c.id)
         total_enroll += counts.get("total", 0)
+        total_pending += pending
         per_course.append({"course_id": str(c.id), "display_name": c.display_name,
-                           "enrollment": counts.get("total", 0)})
+                           "enrollment": counts.get("total", 0), "pending": pending})
     per_course.sort(key=lambda r: r["enrollment"], reverse=True)
     return {"total_courses": len(per_course), "total_enrollments": total_enroll,
-            "courses": per_course}
+            "total_pending": total_pending, "courses": per_course}
 
 
 def user_course_grade(username, course_id):

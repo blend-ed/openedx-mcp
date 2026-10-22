@@ -51,23 +51,84 @@ def bulk_enroll(course_id, entries, mode="audit", auto_enroll=True):
     return {"course_id": str(key), "count": len(entries), "results": results}
 
 
-def preview_bulk_enroll(course_id, entries):
-    """Classify a bulk-enroll batch before applying: which addresses are already
-    actively enrolled vs new. Cheap read; used to build the dry-run audience."""
-    from common.djangoapps.student.models import CourseEnrollment
+def bulk_unenroll(course_id, entries):
+    """Unenroll many by email. Native: instructor.enrollment.unenroll_email (what
+    the Instructor Dashboard's batch unenroll runs). Deactivates an enrollment and
+    also deletes a pending CourseEnrollmentAllowed, so invites to emails with no
+    account can be withdrawn."""
+    from lms.djangoapps.instructor.enrollment import unenroll_email
     key = _course_key(course_id)
+    results = []
+    for e in entries:
+        email = e.get("email")
+        try:
+            before, after = unenroll_email(key, email)[:2]
+            results.append({"email": email,
+                            "was_enrolled": before.enrollment, "was_pending": before.allowed,
+                            "enrolled": after.enrollment, "allowed": after.allowed})
+        except Exception as exc:  # noqa: BLE001 — report per-row, don't abort the batch
+            results.append({"email": email, "error": str(exc)})
+    return {"course_id": str(key), "count": len(entries), "results": results}
+
+
+def _classify(key, entries):
+    """Split a batch of emails by current state in one course: enrolled, pending
+    (CourseEnrollmentAllowed without an active enrollment), has an account but
+    not enrolled, or no account at all."""
+    from common.djangoapps.student.models import CourseEnrollment, CourseEnrollmentAllowed
+    from django.contrib.auth import get_user_model
     emails = [e.get("email", "").strip().lower() for e in entries if e.get("email")]
-    active = set(
-        CourseEnrollment.objects.filter(course_id=key, is_active=True,
-                                        user__email__in=emails)
-        .values_list("user__email", flat=True)
-    )
-    active = {e.lower() for e in active}
-    already = [e for e in emails if e in active]
-    new = [e for e in emails if e not in active]
-    return {"course_id": str(key), "total": len(emails),
-            "already_enrolled": len(already), "to_enroll": len(new),
-            "sample_new": new[:20]}
+    enrolled = {x.lower() for x in CourseEnrollment.objects.filter(
+        course_id=key, is_active=True, user__email__in=emails).values_list("user__email", flat=True)}
+    allowed = {x.lower() for x in CourseEnrollmentAllowed.objects.filter(
+        course_id=key, email__in=emails).values_list("email", flat=True)}
+    accounts = {x.lower() for x in get_user_model().objects.filter(
+        email__in=emails).values_list("email", flat=True)}
+    groups = {"enrolled": [], "pending": [], "account_not_enrolled": [], "no_account": []}
+    for email in emails:
+        if email in enrolled:
+            groups["enrolled"].append(email)
+        elif email in allowed:
+            groups["pending"].append(email)
+        elif email in accounts:
+            groups["account_not_enrolled"].append(email)
+        else:
+            groups["no_account"].append(email)
+    return emails, groups
+
+
+def preview_bulk_enroll(course_id, entries, action="enroll"):
+    """What a bulk enroll/unenroll batch would do, before applying. Cheap reads;
+    used to build the dry-run audience.
+
+    enroll: will_enroll (has an account), will_be_pending (no account yet: gets a
+    CourseEnrollmentAllowed and is enrolled on signup), already_enrolled.
+    unenroll: will_unenroll, will_revoke_pending, not_enrolled (no-op)."""
+    key = _course_key(course_id)
+    emails, g = _classify(key, entries)
+    out = {"course_id": str(key), "action": action, "total": len(emails)}
+    if action == "unenroll":
+        out.update({"will_unenroll": len(g["enrolled"]), "will_revoke_pending": len(g["pending"]),
+                    "not_enrolled": len(g["account_not_enrolled"]) + len(g["no_account"]),
+                    "sample_unenroll": g["enrolled"][:20], "sample_revoke": g["pending"][:20]})
+    else:
+        out.update({"already_enrolled": len(g["enrolled"]),
+                    "will_enroll": len(g["account_not_enrolled"]),
+                    "will_be_pending": len(g["no_account"]) + len(g["pending"]),
+                    "sample_enroll": g["account_not_enrolled"][:20],
+                    "sample_pending": (g["no_account"] + g["pending"])[:20]})
+    return out
+
+
+def pending_count(course_id):
+    """Invites to this course not yet turned into an active enrollment:
+    CourseEnrollmentAllowed rows whose email has no active enrollment."""
+    from common.djangoapps.student.models import CourseEnrollment, CourseEnrollmentAllowed
+    key = _course_key(course_id)
+    enrolled_emails = CourseEnrollment.objects.filter(
+        course_id=key, is_active=True).values("user__email")
+    return CourseEnrollmentAllowed.objects.filter(course_id=key).exclude(
+        email__in=enrolled_emails).count()
 
 
 def reset_student_attempts(course_id, username, block_locator, requesting_user,

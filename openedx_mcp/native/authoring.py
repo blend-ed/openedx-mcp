@@ -100,6 +100,26 @@ def delete_block(user, locator):
 
 # --- settings / details / grading ---
 
+def read_course_settings(course_id):
+    """Schedule/pacing/about details plus the grading policy (graders, cutoffs,
+    grace period). Native: CourseDetails.fetch + CourseGradingModel.fetch,
+    serialised with Studio's own CourseSettingsEncoder."""
+    import json
+
+    from cms.djangoapps.models.settings.course_grading import CourseGradingModel
+    from cms.djangoapps.models.settings.encoder import CourseSettingsEncoder
+    from openedx.core.djangoapps.models.course_details import CourseDetails
+    from xmodule.modulestore.django import modulestore
+    key = CourseKey.from_string(course_id)
+    if not modulestore().has_course(key):
+        return None
+
+    def _plain(obj):
+        return json.loads(json.dumps(obj, cls=CourseSettingsEncoder))
+    return {"course_id": str(key), "details": _plain(CourseDetails.fetch(key)),
+            "grading": _plain(CourseGradingModel.fetch(key))}
+
+
 def update_course_settings(user, course_id, details=None, grading=None, advanced=None):
     """Apply schedule/pacing (details), grading policy, and/or advanced settings.
     Native: CourseDetails / CourseGradingModel / CourseMetadata update_from_json."""
