@@ -34,9 +34,13 @@ def list_user_roles(username_or_email):
     from django.contrib.auth import get_user_model
     user = get_user_model().objects.get(username=username_or_email)
     rows = CourseAccessRole.objects.filter(user=user).values("role", "org", "course_id")
+    # course_id is a CourseKeyField (CourseLocator) — stringify for JSON; org-level
+    # roles have an empty course_id.
+    roles = [{**r, "course_id": str(r["course_id"]) if r["course_id"] else None}
+             for r in rows]
     return {"user": user.username,
             "is_staff": user.is_staff, "is_superuser": user.is_superuser,
-            "roles": list(rows)}
+            "roles": roles}
 
 
 def grant_course_role(username_or_email, level, course_id):

@@ -2,4 +2,5 @@
 pytest
 pytest-django
 pytest-cov
+edx-opaque-keys  # imported at module level by native/ wrappers
 ruff

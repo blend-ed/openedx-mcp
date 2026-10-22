@@ -19,10 +19,12 @@ urlpatterns = [
     # reads
     path("analytics/overview/", v.AnalyticsOverviewView.as_view(), name="analytics-overview"),
     path("courses/", v.CoursesView.as_view(), name="courses"),
+    # <path:> is greedy (matches "/"), so sub-routes of a course must precede
+    # the bare course-detail route or they get swallowed by it.
+    path(f"courses/{COURSE_ID}/team/", v.CourseTeamView.as_view(), name="course-team"),
     path(f"courses/{COURSE_ID}/", v.CourseDetailView.as_view(), name="course-detail"),
     path("users/", v.UsersView.as_view(), name="users"),
     path("users/<str:username>/roles/", v.UserRolesView.as_view(), name="user-roles"),
-    path(f"courses/{COURSE_ID}/team/", v.CourseTeamView.as_view(), name="course-team"),
     path(f"grades/<str:username>/{COURSE_ID}/", v.UserGradeView.as_view(), name="user-grade"),
 
     # writes — enrollment

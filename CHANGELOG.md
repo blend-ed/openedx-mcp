@@ -3,6 +3,20 @@
 All notable changes to `openedx-mcp`. Format based on
 [Keep a Changelog](https://keepachangelog.com/). Ulmo release line.
 
+## [Unreleased]
+
+### Fixed
+- `courses/<course_id>/team/` always returned 500: the greedy `<path:course_id>`
+  in the course-detail route swallowed `.../team`. The team route is now
+  registered first.
+- `users/<username>/roles/` returned 500 for any user with course roles
+  (`CourseLocator` is not JSON serializable). `course_id` is now a string.
+- The CMS course outline returned only the course root: `create_xblock_info`
+  defaults `include_children_predicate` to `NEVER`. It now walks the whole tree
+  and returns a compact projection per block (id, display_name, category,
+  published, has_changes, visibility_state, graded, format, start, due,
+  children) instead of Studio's full ~40-key xblock info.
+
 ## [0.1.7]
 
 ### Changed
