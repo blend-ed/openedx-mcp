@@ -3,7 +3,7 @@
 All notable changes to `openedx-mcp`. Format based on
 [Keep a Changelog](https://keepachangelog.com/). Ulmo release line.
 
-## [Unreleased]
+## [0.1.9]
 
 ### Fixed
 - `create_user` always failed with a 500 on Ulmo: `AccountCreationForm` moved to
