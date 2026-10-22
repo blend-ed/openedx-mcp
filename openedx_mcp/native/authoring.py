@@ -10,14 +10,36 @@ from opaque_keys.edx.keys import CourseKey, UsageKey
 
 # --- outline / xblock CRUD ---
 
+# Fields kept per block in the outline. create_xblock_info returns ~40 keys per
+# block (user_partitions, actions, urls, ...) — far too much for an LLM on a
+# whole course, so the tree is projected down to these.
+_OUTLINE_FIELDS = ("id", "display_name", "category", "published", "has_changes",
+                   "visibility_state", "graded", "format", "start", "due")
+
+
+def _compact_outline(info):
+    node = {k: info.get(k) for k in _OUTLINE_FIELDS if info.get(k) is not None}
+    children = (info.get("child_info") or {}).get("children")
+    if children:
+        node["children"] = [_compact_outline(c) for c in children]
+    return node
+
+
 def read_outline(user, course_id):
-    """Full draft tree. Native: modulestore().get_course + create_xblock_info."""
-    from cms.djangoapps.contentstore.xblock_storage_handlers.view_handlers import create_xblock_info
+    """Full draft tree (course > chapter > sequential > vertical > component).
+    Native: modulestore().get_course + create_xblock_info. Its
+    include_children_predicate defaults to NEVER (root only), so pass ALWAYS."""
+    from cms.djangoapps.contentstore.xblock_storage_handlers.view_handlers import (
+        ALWAYS,
+        create_xblock_info,
+    )
     from xmodule.modulestore.django import modulestore
     course = modulestore().get_course(CourseKey.from_string(course_id), depth=None)
     if course is None:
         return None
-    return create_xblock_info(course, include_child_info=True, course_outline=False)
+    info = create_xblock_info(course, include_child_info=True, course_outline=False,
+                              include_children_predicate=ALWAYS, user=user, course=course)
+    return _compact_outline(info)
 
 
 def create_block(user, parent_locator, category, display_name=None, boilerplate=None):
