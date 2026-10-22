@@ -23,22 +23,39 @@ class EnrollUserView(MCPView):
 
 
 class UnenrollUserView(MCPView):
-    @audited_write("unenroll_user", scope=Scope.WRITE_ENROLLMENT, require_confirm=False)
+    """Confirm-gated: unenrolling can drop a learner's access mid-course."""
+    @audited_write("unenroll_user", scope=Scope.WRITE_ENROLLMENT, require_confirm=True)
     def post(self, request, confirmed=True):
         d = request.data
-        return Response(ne.unenroll(d["username"], d["course_id"])), 1
+        username, course_id = d["username"], d["course_id"]
+        if not confirmed:
+            current = ne.get_enrollment(username, course_id)
+            if not current or not current.get("is_active"):
+                return Response({"error": f"{username} is not actively enrolled in {course_id}."},
+                                status=404)
+            return Response({"would_unenroll": username, "course_id": course_id,
+                             "current_mode": current.get("mode")})
+        return Response(ne.unenroll(username, course_id)), 1
 
 
 class BulkEnrollView(MCPView):
+    """Enroll or unenroll many by email. action=unenroll also withdraws pending
+    invites (emails with no account yet)."""
     @audited_write("bulk_enroll", scope=Scope.WRITE_ENROLLMENT, require_confirm=True)
     def post(self, request, confirmed=True):
         d = request.data
         entries = d.get("entries", [])
+        action = d.get("action", "enroll")
+        if action not in ("enroll", "unenroll"):
+            return Response({"error": "action must be 'enroll' or 'unenroll'."}, status=400)
         if not confirmed:
-            # Real audience preview: split already-enrolled vs new, with a sample.
-            preview = ne.preview_bulk_enroll(d["course_id"], entries)
-            preview["mode"] = d.get("mode", "audit")
+            # Real audience preview: what happens to each address, with samples.
+            preview = ne.preview_bulk_enroll(d["course_id"], entries, action=action)
+            if action == "enroll":
+                preview["mode"] = d.get("mode", "audit")
             return Response(preview)
+        if action == "unenroll":
+            return Response(ne.bulk_unenroll(d["course_id"], entries)), len(entries)
         result = ne.bulk_enroll(d["course_id"], entries, mode=d.get("mode", "audit"),
                                 auto_enroll=d.get("auto_enroll", True))
         return Response(result), len(entries)
@@ -49,8 +66,14 @@ class CreateUserView(MCPView):
     def post(self, request, confirmed=True):
         d = request.data
         if not confirmed:
-            return Response({"would_create": {"email": d.get("email"),
-                                              "username": d.get("username")}})
+            conflicts = nu.account_conflicts(d["email"], d["username"])
+            if conflicts:
+                return Response({"error": "Already taken: " + ", ".join(conflicts) + ".",
+                                 "conflicts": conflicts}, status=409)
+            return Response({"would_create": {
+                "email": d["email"], "username": d["username"],
+                "name": d.get("name") or d["username"], "is_active": False,
+                "send_activation_email": bool(d.get("send_activation_email", False))}})
         result = nu.create_user(d["email"], d["username"], name=d.get("name", ""),
                                 send_activation_email=d.get("send_activation_email", False))
         return Response(result), 1

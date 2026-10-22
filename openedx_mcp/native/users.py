@@ -42,11 +42,17 @@ def create_user(email, username, name="", password=None, send_activation_email=F
     """Create an account WITHOUT logging anyone in. Native path:
     student.helpers.do_create_account(form) → (user, profile, registration),
     user.is_active=False. Prefer this over create_account_with_params, which
-    authenticates the caller into the session as a side effect."""
+    authenticates the caller into the session as a side effect.
+
+    Raises django ValidationError for a taken/invalid username or email, and
+    PermissionDenied when the platform has ALLOW_PUBLIC_ACCOUNT_CREATION off."""
     import uuid
 
-    from common.djangoapps.student.forms import AccountCreationForm
     from common.djangoapps.student.helpers import do_create_account
+    from common.djangoapps.student.views.management import compose_and_send_activation_email
+
+    # Ulmo moved the form out of student.forms.
+    from openedx.core.djangoapps.user_authn.views.registration_form import AccountCreationForm
 
     form = AccountCreationForm(
         data={
@@ -59,8 +65,20 @@ def create_user(email, username, name="", password=None, send_activation_email=F
     )
     user, profile, registration = do_create_account(form)
     if send_activation_email:
-        registration.send_activation_email = getattr(registration, "send_activation_email", None)
-    return _user_dict(user)
+        # Queues the platform's activation email (celery); failures are logged
+        # by the platform, not raised.
+        compose_and_send_activation_email(user, profile, registration)
+    return {**_user_dict(user), "activation_email_queued": bool(send_activation_email)}
+
+
+def account_conflicts(email, username):
+    """Which of email/username already belong to an account (for previews)."""
+    conflicts = []
+    if username and User.objects.filter(username=username).exists():
+        conflicts.append("username")
+    if email and User.objects.filter(email__iexact=email).exists():
+        conflicts.append("email")
+    return conflicts
 
 
 def set_global_staff(username_or_email, value):

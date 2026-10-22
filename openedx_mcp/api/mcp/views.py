@@ -4,11 +4,12 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ...models import MCPAuditLog
 from ...native import analytics as na
 from ...native import roles as nr
 from ...native import users as nu
 from .auth import get_key, granted_scopes
-from .base import MCPView
+from .base import MCPView, int_param
 
 
 class HealthView(APIView):
@@ -43,8 +44,8 @@ class CoursesView(MCPView):
     def get(self, request):
         return Response(na.list_courses(
             org=request.query_params.get("org"),
-            limit=int(request.query_params.get("limit", 100)),
-            offset=int(request.query_params.get("offset", 0)),
+            limit=int_param(request, "limit", 100),
+            offset=int_param(request, "offset", 0),
         ))
 
 
@@ -62,8 +63,8 @@ class UsersView(MCPView):
         return Response(nu.list_users(
             query=request.query_params.get("q", ""),
             is_staff=None if is_staff is None else is_staff.lower() == "true",
-            limit=int(request.query_params.get("limit", 50)),
-            offset=int(request.query_params.get("offset", 0)),
+            limit=int_param(request, "limit", 50),
+            offset=int_param(request, "offset", 0),
         ))
 
 
@@ -80,3 +81,27 @@ class CourseTeamView(MCPView):
 class UserGradeView(MCPView):
     def get(self, request, username, course_id):
         return Response(na.user_course_grade(username, course_id))
+
+
+class AuditLogView(MCPView):
+    """Recent MCP write-tool audit rows, newest first. Superusers see every key's
+    rows; staff see only rows for their own account."""
+    def get(self, request):
+        qs = MCPAuditLog.objects.select_related("key", "user")
+        if not request.user.is_superuser:
+            qs = qs.filter(user=request.user)
+        for field in ("tool", "outcome"):
+            value = request.query_params.get(field)
+            if value:
+                qs = qs.filter(**{field: value})
+        limit = min(int_param(request, "limit", 50), 200)
+        offset = int_param(request, "offset", 0)
+        total = qs.count()
+        rows = [{
+            "at": r.created_at.isoformat(), "tool": r.tool, "outcome": r.outcome,
+            "user": r.user.username if r.user else None,
+            "key": r.key.name if r.key else None,
+            "affected": r.affected_count, "request": r.request_summary,
+            "error": r.error or None,
+        } for r in qs[offset:offset + limit]]
+        return Response({"total": total, "limit": limit, "offset": offset, "rows": rows})

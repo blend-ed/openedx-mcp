@@ -14,6 +14,11 @@ enrols or deletes. Four rails, applied by the `audited_write` decorator:
  4. Append-only audit — intent recorded before the write; the write is refused if
     the record cannot be persisted.
 
+The write runs in its own savepoint. The LMS sets ATOMIC_REQUESTS, so a re-raised
+exception would roll back the whole request — audit rows included. Instead a
+failed write rolls back only its savepoint, the error is audited, and the caller
+gets a JSON error. Nothing half-written is committed.
+
 The confirm-token store and rate-limit counter use the ambient Django cache. In
 production that must be a shared backend (Redis/memcached); under LocMemCache
 (dev) both are per-process.
@@ -21,6 +26,7 @@ production that must be a shared backend (Redis/memcached); under LocMemCache
 import functools
 import logging
 
+from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -35,6 +41,7 @@ from ._rails import (
     redact,
 )
 from .auth import get_key, require_scopes
+from .base import error_response
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +54,13 @@ def _unpack(result):
     if isinstance(result, tuple):
         return result[0], result[1]
     return result, 0
+
+
+def _api_error(exc):
+    """Render a DRF APIException here rather than re-raising it: DRF's handler
+    marks the whole request for rollback, which would drop the audit rows."""
+    detail = exc.detail if isinstance(exc.detail, dict) else {"error": exc.detail}
+    return Response(detail, status=exc.status_code)
 
 
 def audited_write(tool, scope="", destructive=False, require_confirm=True):
@@ -91,12 +105,25 @@ def audited_write(tool, scope="", destructive=False, require_confirm=True):
                     status=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
 
+            def _run(confirmed):
+                """Call the view in a savepoint. Returns (resp, affected, exc)."""
+                try:
+                    with transaction.atomic():
+                        resp, affected = _unpack(view_method(
+                            self, request, *args, confirmed=confirmed, **kwargs))
+                        if resp.status_code >= 400:
+                            # e.g. a bulk call that failed part-way: undo it all.
+                            transaction.set_rollback(True)
+                        return resp, affected, None
+                except Exception as exc:  # noqa: BLE001 — savepoint already rolled back
+                    return error_response(exc) or _api_error(exc), 0, exc
+
             if require_confirm:
                 confirmed = consume_confirm_token(payload.get("confirm_token"),
                                                   tool, user_id, plan)
                 if not confirmed:
                     _audit("dry_run")
-                    resp, _ = _unpack(view_method(self, request, *args, confirmed=False, **kwargs))
+                    resp, _, _ = _run(False)
                     if resp.status_code < 400 and isinstance(resp.data, dict):
                         resp.data["dry_run"] = True
                         resp.data["confirm_token"] = issue_confirm_token(tool, user_id, plan)
@@ -108,12 +135,10 @@ def audited_write(tool, scope="", destructive=False, require_confirm=True):
                     return resp
 
             _audit("attempt")
-            try:
-                result = view_method(self, request, *args, confirmed=True, **kwargs)
-            except Exception as exc:  # noqa: BLE001 — record then re-raise
-                _audit("error", error=str(exc))
-                raise
-            resp, affected = _unpack(result)
+            resp, affected, exc = _run(True)
+            if exc is not None:
+                _audit("error", error=f"{type(exc).__name__}: {exc}")
+                return resp
             _audit("success" if resp.status_code < 400 else "error",
                    affected=affected,
                    error="" if resp.status_code < 400 else str(getattr(resp, "data", ""))[:500])

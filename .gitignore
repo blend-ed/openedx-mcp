@@ -9,3 +9,7 @@ __pycache__/
 .venv/
 env/
 .DS_Store
+
+# Test artifacts
+.coverage
+.pytest_cache/

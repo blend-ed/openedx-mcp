@@ -6,7 +6,7 @@ from ...models import Scope
 from ...native import certificates as nc
 from ...native import reports as nrep
 from ...native import retirement as nret
-from .base import MCPView
+from .base import MCPView, int_param
 from .guards import audited_write
 
 # --- certificates ---
@@ -24,8 +24,8 @@ class UserCertificatesView(MCPView):
 class CourseCertificatesView(MCPView):
     def get(self, request, course_id):
         return Response(nc.list_course_certificates(
-            course_id, limit=int(request.query_params.get("limit", 200)),
-            offset=int(request.query_params.get("offset", 0))))
+            course_id, limit=int_param(request, "limit", 200),
+            offset=int_param(request, "offset", 0)))
 
 
 class GenerateCertificateView(MCPView):

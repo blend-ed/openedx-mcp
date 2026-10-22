@@ -92,6 +92,10 @@ First call the `whoami` tool — confirms identity + granted scopes.
   token handshake for high-blast-radius/destructive tools, and an append-only
   `MCPAuditLog` written before the mutation. `destructive` is **additive** — a
   destructive tool needs its domain scope **and** `destructive`.
+- **Failed writes** run in their own savepoint: a failure rolls back that write's
+  database changes, keeps its `error` audit row, and returns JSON. Errors are
+  always JSON — bad ids are 404, missing fields and bad params are 400. Studio
+  content lives in the modulestore, which a database savepoint cannot undo.
 
 > **Production:** the confirm-token store and rate-limit counter use the ambient
 > Django cache — point it at a **shared backend (Redis/memcached)**. Under
@@ -116,12 +120,13 @@ First call the `whoami` tool — confirms identity + granted scopes.
 | Tool | Process | Scope | Native API |
 |---|---|---|---|
 | `whoami` | LMS | read | request.user |
+| `audit_log` | LMS | read | `MCPAuditLog` (superuser: all keys; staff: own rows) |
 | `analytics_overview` | LMS | read | `CourseOverview` + `enrollment_counts` |
 | `list_courses` / `course_detail` | LMS | read | `course_overviews` |
 | `list_users` / `user_roles` / `course_team` | LMS | read | `auth.User`, `CourseAccessRole`, course roles |
 | `user_grade` | LMS | read | `grades.api.CourseGradeFactory` |
-| `enroll` / `unenroll` / `bulk_enroll` | LMS | write:enrollment | `enrollments.api`, `instructor.enrollment` |
-| `create_user` | LMS | write:users | `student.helpers.do_create_account` |
+| `enroll` / `unenroll` / `bulk_enroll` (enroll or unenroll) | LMS | write:enrollment | `enrollments.api`, `instructor.enrollment.enroll_email` / `unenroll_email` |
+| `create_user` | LMS | write:users | `student.helpers.do_create_account`, `compose_and_send_activation_email` |
 | `reset_student_attempts` | LMS | write:users | `instructor.enrollment.reset_student_attempts` |
 | `set_role` | LMS | write:roles / grant:admin | `student.roles`, `GlobalStaff` |
 | `instructor_access` | LMS | write:roles | `instructor.access.allow/revoke_access` |
@@ -132,6 +137,7 @@ First call the `whoami` tool — confirms identity + granted scopes.
 | `submit_report` / `report_tasks` / `report_downloads` | LMS | write:reports / read | `instructor_task.api`, `ReportStore` |
 | `retirement_status` / `request_retirement` | LMS | read / write:users + destructive | `UserRetirementStatus`, retirement utils |
 | `read_course_outline` | CMS | read | `modulestore` + `create_xblock_info` |
+| `read_course_settings` | CMS | read | `CourseDetails.fetch` / `CourseGradingModel.fetch` |
 | `create_block` / `create_block_tree` / `update_block` | CMS | write:courses | `xblock_storage_handlers` |
 | `publish_block` / `delete_block` | CMS | write:courses (+destructive) | `modulestore().publish`, `_delete_item` |
 | `update_course_settings` | CMS | write:courses | `CourseDetails` / `CourseGradingModel` / `CourseMetadata` |

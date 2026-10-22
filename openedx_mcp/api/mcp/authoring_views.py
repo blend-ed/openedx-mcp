@@ -17,6 +17,14 @@ class CourseOutlineView(MCPView):
         return Response(outline)
 
 
+class CourseSettingsReadView(MCPView):
+    def get(self, request, course_id):
+        settings = nau.read_course_settings(course_id)
+        if settings is None:
+            return Response({"error": "No such course."}, status=404)
+        return Response(settings)
+
+
 class CreateBlockView(MCPView):
     @audited_write("create_xblock", scope=Scope.WRITE_COURSES, require_confirm=False)
     def post(self, request, confirmed=True):

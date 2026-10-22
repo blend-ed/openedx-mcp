@@ -9,8 +9,10 @@ app_name = "openedx_mcp_cms"
 COURSE_ID = "<path:course_id>"
 
 urlpatterns = [
-    path(f"courses/{COURSE_ID}/outline/", av.CourseOutlineView.as_view(), name="outline"),
     path("courses/settings/", av.UpdateCourseSettingsView.as_view(), name="course-settings"),
+    path(f"courses/{COURSE_ID}/outline/", av.CourseOutlineView.as_view(), name="outline"),
+    path(f"courses/{COURSE_ID}/settings/", av.CourseSettingsReadView.as_view(),
+         name="course-settings-read"),
 
     path("blocks/create/", av.CreateBlockView.as_view(), name="create-block"),
     path("blocks/create-tree/", av.CreateBlockTreeView.as_view(), name="create-block-tree"),

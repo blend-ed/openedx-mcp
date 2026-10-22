@@ -26,6 +26,7 @@ urlpatterns = [
     path("users/", v.UsersView.as_view(), name="users"),
     path("users/<str:username>/roles/", v.UserRolesView.as_view(), name="user-roles"),
     path(f"grades/<str:username>/{COURSE_ID}/", v.UserGradeView.as_view(), name="user-grade"),
+    path("audit/", v.AuditLogView.as_view(), name="audit-log"),
 
     # writes — enrollment
     path("enroll/", tv.EnrollUserView.as_view(), name="enroll"),
