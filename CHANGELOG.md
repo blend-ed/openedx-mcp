@@ -3,7 +3,7 @@
 All notable changes to `openedx-mcp`. Format based on
 [Keep a Changelog](https://keepachangelog.com/). Ulmo release line.
 
-## [Unreleased]
+## [0.1.8]
 
 ### Fixed
 - `courses/<course_id>/team/` always returned 500: the greedy `<path:course_id>`
